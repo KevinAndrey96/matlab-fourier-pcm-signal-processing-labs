@@ -1,103 +1,112 @@
-# Laboratorios de Procesamiento de Señales y Teoría de la Información en MATLAB y GNU Octave
+# Laboratorios de Fourier y PCM en MATLAB y GNU Octave
 
-[![MATLAB](https://img.shields.io/badge/Language-MATLAB%20%2F%20GNU%20Octave-blue.svg)](https://www.mathworks.com/products/matlab.html)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/KevinAndrey96/matlab-fourier-pcm-signal-processing-labs/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinAndrey96/matlab-fourier-pcm-signal-processing-labs/actions/workflows/ci.yml)
+![MATLAB](https://img.shields.io/badge/MATLAB-R2026a-0076A8)
+![GNU Octave](https://img.shields.io/badge/GNU%20Octave-11-0790C0)
+[![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-yellow.svg)](LICENSE)
 
-Colección de prácticas y laboratorios computacionales desarrollados en **MATLAB y GNU Octave** para el análisis de señales continuas y discretas, transformadas de Fourier y sistemas de transmisión digital mediante **Modulación por Codificación de Pulsos (PCM)**.
+Dos laboratorios de **teoría de la información y comunicaciones** convertidos en una caja de herramientas probada para MATLAB y GNU Octave:
 
----
+1. **Fourier y filtros ideales.** Pulso rectangular, su transformada analítica $2a\,\mathrm{Sa}(\omega a)$, la aproximación con FFT escalada y los cuatro filtros ideales (pasa bajas, pasa altas, pasa banda y suprime banda).
+2. **Modulación por codificación de pulsos (PCM).** Muestreo sobre la tasa de Nyquist, cuantización uniforme, codificación binaria, seis códigos de línea y recuperación por interpolación de Whittaker-Shannon, con la relación señal a ruido de cuantización medida frente a la teórica.
 
-## 📡 Contenido de los Laboratorios
+## Contenido
 
-```mermaid
-flowchart TD
-    subgraph Lab1["Laboratorio 1: Dominio del Tiempo y Frecuencia"]
-        A["Pulso Rectangular x(t)"] --> B["Transformada Teórica Sa(ω)"]
-        A --> C["Transformada Rápida de Fourier (FFT)"]
-        B & C --> D["Comparación Espectral"]
-    end
-    subgraph Lab2["Laboratorio 2: Transmisión Digital PCM"]
-        E["Señal Analógica Continua"] --> F["Muestreo de Nyquist (fs >= 2 fm)"]
-        F --> G["Cuantización Uniforme (2^n niveles)"]
-        G --> H["Codificación Binaria PCM"]
-    end
-```
+- [Laboratorio 1: Fourier y filtros ideales](#laboratorio-1-fourier-y-filtros-ideales)
+- [Laboratorio 2: PCM](#laboratorio-2-pcm)
+- [Funciones](#funciones)
+- [Ejecución](#ejecución)
+- [Pruebas y calidad](#pruebas-y-calidad)
+- [Historia del proyecto](#historia-del-proyecto)
 
----
+## Laboratorio 1: Fourier y filtros ideales
 
-### 🔬 Laboratorio 1: Pulso Rectangular y Análisis Espectral de Fourier
+El pulso rectangular de semiancho $a$ y su transformada de Fourier son
 
-Aborda la dualidad tiempo-frecuencia para una señal de pulso rectangular de ancho $2a$:
+$$
+x(t) = \begin{cases} 1 & |t| < a \\ 0 & |t| > a \end{cases}
+\qquad\Longrightarrow\qquad
+X(\omega) = \int_{-\infty}^{\infty} x(t)\,e^{-j\omega t}\,dt = 2a\,\frac{\sin(\omega a)}{\omega a}.
+$$
 
-$$x(t) = \text{rect}\left(\frac{t}{2a}\right) = \begin{cases} 1 & |t| < a \\ 0 & |t| \ge a \end{cases}$$
+La FFT calcula la transformada discreta $X_k = \sum_n x_n e^{-j 2\pi k n / N}$. Para aproximar la transformada continua hay que multiplicar por el intervalo de muestreo $\Delta t$, usar el eje de frecuencias $\omega_k = 2\pi k / (N \Delta t)$ centrado con `fftshift` y corregir la fase $e^{-j\omega t_0}$ cuando la señal no empieza en $t_0 = 0$. Con 4000 muestras la diferencia máxima entre ambas curvas es $2.4 \times 10^{-4}$:
 
-1. **Transformada Continua Teórica de Fourier**:
-   Deducción matemática mediante la función de muestreo o sinc no normalizada ($Sa(x) = \frac{\sin x}{x}$):
+![Pulso rectangular y transformada de Fourier](docs/figures/lab1-spectrum.png)
 
-   $$X(\omega) = \int_{-\infty}^{\infty} x(t) e^{-j\omega t} \, dt = 2a \frac{\sin(\omega a)}{\omega a} = 2a \cdot Sa(\omega a)$$
+Un filtro ideal multiplica el espectro por una máscara de unos y ceros; la salida en el tiempo se obtiene con la FFT inversa. El pasa bajas conserva el 91.3 % de la energía del pulso y muestra el fenómeno de Gibbs en los bordes (sobreimpulso cercano al 9 %), el pasa altas conserva solo las transiciones y los filtros de banda se reparten la energía de forma complementaria:
 
-2. **Transformada Rápida de Fourier Discreta (FFT)**:
-   Cálculo computacional mediante el algoritmo `fft()`, aplicando `fftshift()` para centrar el componente continuo (frecuencia cero $\omega = 0$) en el origen del espectro y contrastar directamente la aproximación numérica frente a la solución analítica continua.
+![Filtros ideales aplicados al pulso](docs/figures/lab1-filters.png)
 
----
+## Laboratorio 2: PCM
 
-### 🔬 Laboratorio 2: Modulación por Codificación de Pulsos (PCM)
+La señal $x(t) = 0.7\sin(2\pi t) + 0.25\sin(6\pi t + 0.4)$ tiene frecuencia máxima $f_m = 3$ Hz. Se muestrea a $f_s = 24$ Hz, por encima de la tasa de Nyquist $2 f_m = 6$ Hz, y pasa por:
 
-Simula la cadena completa de conversión analógica a digital (ADC) bajo la arquitectura clásica de **PCM (Pulse Code Modulation)**:
+1. **Cuantización uniforme de media huella** con $L = 2^n$ niveles sobre $[-1, 1]$: paso $\Delta = 2/L$, cada muestra va al centro de su celda y el error queda acotado por $\Delta/2$.
+2. **Codificación PCM** de cada nivel en $n$ bits, el más significativo primero. Con $n = 3$, 49 muestras producen 147 bits a 72 bit/s.
+3. **Códigos de línea** para transmitir los bits en banda base.
+4. **Recuperación** con la interpolación de Whittaker-Shannon
 
-1. **Teorema de Muestreo de Nyquist-Shannon**:
-   Para muestrear sin solapamiento espectral (*aliasing*) una señal periódica con frecuencia máxima $f_m$, se establece la frecuencia de muestreo de Nyquist:
+$$
+\hat{x}(t) = \sum_n x_q[n]\,\mathrm{sinc}\!\left(\frac{t - nT_s}{T_s}\right), \qquad \mathrm{sinc}(u) = \frac{\sin(\pi u)}{\pi u}.
+$$
 
-   $$f_s \ge 2 f_m$$
+La relación señal a ruido de cuantización de un seno a plena escala sigue la regla $\mathrm{SQNR} \approx 6.02\,n + 1.76$ dB: cada bit adicional aporta unos 6 dB. Las pruebas lo verifican con 6, 8 y 12 bits.
 
-2. **Cuantización Uniforme**:
-   Discretización del rango de amplitud continua en $L = 2^n$ niveles cuánticos equidistantes con tamaño de escalón $\Delta = \frac{V_{max} - V_{min}}{L}$.
-3. **Codificación Binaria**:
-   Traducción de cada nivel cuantizado a secuencias de palabras de código binarias de $n = \log_2(L)$ bits por muestra para su transmisión por un canal digital.
+![Muestreo, cuantización y recuperación](docs/figures/lab2-pcm.png)
 
----
+| Código | Regla |
+| :--- | :--- |
+| Unipolar NRZ | 1 se envía como $+1$ todo el bit, 0 como $0$. |
+| Polar NRZ | 1 como $+1$, 0 como $-1$. |
+| Unipolar RZ | 1 como $+1$ durante medio bit y luego $0$. |
+| Bipolar RZ | 1 como $+1$ y 0 como $-1$, ambos durante medio bit. |
+| AMI | 0 como $0$; los unos alternan $+1$ y $-1$, lo que elimina la componente continua. |
+| Manchester (IEEE 802.3) | 1 como transición de bajo a alto y 0 de alto a bajo: siempre hay una transición por bit para recuperar el reloj. |
 
-## 📂 Estructura del Repositorio
+![Códigos de línea](docs/figures/lab2-line-codes.png)
 
-```text
-teoria-de-la-inf/
-├── Lab1/
-│   └── Punto2/
-│       ├── pulsoRectangular.m   # Definicion vectorial del pulso rectangular temporal
-│       └── main.m               # Generacion de graficas (tiempo, Sa(w) analitica y FFT)
-└── Lab2/
-    ├── punto1.m                 # Script maestro de muestreo, cuantizacion y codificacion PCM
-    ├── cuantUniforme.m          # Modulo de cuantizacion uniforme en 2^n niveles
-    ├── get_nivel.m              # Mapeo de muestras continuas a indices enteros de nivel
-    └── convertir_10.m           # Convertidor de niveles decimales a palabras de codigo binarias
-```
+## Funciones
 
----
+| Función | Descripción |
+| :--- | :--- |
+| `rect_pulse(t, a)` | Pulso rectangular con valor $1/2$ en los bordes. |
+| `rect_pulse_spectrum(omega, a)` | Transformada analítica $2a\,\mathrm{Sa}(\omega a)$. |
+| `fourier_spectrum(x, t)` | Transformada continua aproximada con FFT, escalada y con fase corregida. |
+| `ideal_filter_mask(omega, tipo, corte)` | Respuesta de los filtros `lowpass`, `highpass`, `bandpass` y `bandstop`. |
+| `apply_ideal_filter(x, t, tipo, corte)` | Filtrado en frecuencia y regreso al tiempo. |
+| `uniform_quantizer(x, xmax, bits)` | Valores cuantizados e índices de nivel. |
+| `pcm_encode(niveles, bits)` / `pcm_decode(bits, n)` | Codificación y decodificación PCM. |
+| `line_code(bits, esquema, muestras_por_bit, tasa)` | Forma de onda de los seis códigos de línea. |
+| `sinc_reconstruct(muestras, tiempos, t)` | Interpolación de Whittaker-Shannon. |
+| `quantization_snr(x, xq, bits)` | SQNR medida y teórica en dB. |
 
-## 🚀 Requisitos y Ejecución
-
-### Prerrequisitos
-
-- **MATLAB** (R2016a o superior) o **GNU Octave** (4.0 o superior).
-
-### Ejecutar Laboratorio 1 (FFT y Pulso Rectangular)
-
-```bash
-cd Lab1/Punto2
-octave --persist main.m
-```
-
-### Ejecutar Laboratorio 2 (Muestreo y Cuantización PCM)
+## Ejecución
 
 ```bash
-cd Lab2
-octave --persist punto1.m
+cd examples
+octave-cli --eval "lab1_fourier_filters(); lab2_pcm_pipeline()"
+matlab -batch "lab1_fourier_filters('../figures'); lab2_pcm_pipeline('../figures')"
 ```
 
-Al iniciar el script, ingresa la señal matemática a muestrear (por ejemplo: `sin(x)` o `cos(2*x)`). El script generará los gráficos de la señal original, la señal muestreada a tasa de Nyquist, la señal cuantizada y el flujo de bits resultante.
+Sin argumentos los laboratorios muestran las figuras; con una carpeta las guardan como PNG. Las figuras de este README las genera el job de MATLAB del pipeline.
 
----
+## Pruebas y calidad
 
-## 📄 Licencia
+```bash
+octave-cli --eval "cd tests; run_tests"
+matlab -batch "cd tests; run_tests"
+```
 
-Distribuido bajo la Licencia MIT. Consulta el archivo `LICENSE` para más información.
+19 pruebas cubren la transformada por FFT frente a la analítica, el teorema de desplazamiento, las cuatro máscaras, el sobreimpulso de Gibbs, la complementariedad de los filtros, el error y la saturación del cuantizador, la regla de 6 dB por bit, la ida y vuelta de PCM, cada código de línea, la ausencia de componente continua en AMI y Manchester y la reconstrucción sinc. El pipeline de GitHub Actions ejecuta MISS_HIT, las pruebas y los laboratorios en el contenedor oficial de GNU Octave 11 y en MATLAB.
+
+## Historia del proyecto
+
+Los laboratorios se entregaron en 2020 como scripts de Octave con menús interactivos. Al reescribirlos en 2026 se corrigieron varios errores del original: la FFT se graficaba contra el eje del tiempo y sin escalar, el muestreo usaba la frecuencia de muestreo como paso de tiempo, la codificación usaba $\log_2 n$ bits en lugar de $n$ bits por muestra y la fórmula de recuperación tenía los paréntesis del sinc mal ubicados. El código original se conserva en el tag [`v0.1-octave-labs-2020`](https://github.com/KevinAndrey96/matlab-fourier-pcm-signal-processing-labs/tree/v0.1-octave-labs-2020).
+
+## Autor
+
+**Kevin Andrey Herrera Silva** · [GitHub](https://github.com/KevinAndrey96)
+
+## Licencia
+
+Distribuido bajo la [licencia MIT](LICENSE).
