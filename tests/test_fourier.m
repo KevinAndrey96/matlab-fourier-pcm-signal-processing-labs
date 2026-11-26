@@ -56,7 +56,7 @@ function lowpass_filter_smooths_the_pulse()
     overshoot = max(y) - 1;
     assert_true(overshoot > 0.08 && overshoot < 0.1, ...
                 sprintf('Gibbs overshoot near 9%%, got %.3f', overshoot));
-    assert_close(sum(y) * dt, 2, 1e-6, 'area is kept because X(0) passes');
+    assert_close(sum(y), sum(x), 1e-9, 'area is kept because X(0) passes');
 end
 
 function complementary_filters_add_up_to_the_signal()
